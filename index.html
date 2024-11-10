@@ -10,6 +10,25 @@
         .negative { color: #dc3545; }
         .card { margin-bottom: 20px; }
         .table th { background-color: #f8f9fa; }
+        .table-responsive {
+            scrollbar-width: thin;
+            scrollbar-color: #888 #f5f5f5;
+        }
+        .table-responsive::-webkit-scrollbar {
+            width: 8px;
+        }
+        .table-responsive::-webkit-scrollbar-track {
+            background: #f5f5f5;
+        }
+        .table-responsive::-webkit-scrollbar-thumb {
+            background-color: #888;
+            border-radius: 4px;
+        }
+        .sticky-top {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
     </style>
 </head>
 <body>
@@ -66,12 +85,17 @@
 
         <!-- Trade History -->
         <div class="card mt-4">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h4 class="mb-0">Trade History</h4>
+                <div class="btn-group">
+                    <button class="btn btn-outline-primary" onclick="filterTrades('all')">All</button>
+                    <button class="btn btn-outline-success" onclick="filterTrades('profit')">Profit</button>
+                    <button class="btn btn-outline-danger" onclick="filterTrades('loss')">Loss</button>
+                </div>
             </div>
-            <div class="table-responsive">
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
                 <table class="table table-hover">
-                    <thead>
+                    <thead class="sticky-top bg-white">
                         <tr>
                             <th>Date</th>
                             <th>Type</th>
@@ -82,7 +106,7 @@
                             <th>Balance</th>
                         </tr>
                     </thead>
-                    <tbody id="tradeHistory">
+                    <tbody id="tradeHistoryBody">
                         <!-- JavaScript로 채워질 내용 -->
                     </tbody>
                 </table>
@@ -97,8 +121,29 @@
 
         function updateTimeframe(timeframe) {
             $.get('/get_trading_data', { timeframe: timeframe }, function(data) {
-                updateCharts(data[timeframe]);
-                updateAnalysis(data[timeframe].analysis);
+                console.log('Received data:', data);
+                if (data && data[timeframe] && 
+                    data[timeframe].timestamps && 
+                    data[timeframe].prices && 
+                    data[timeframe].entries && 
+                    data[timeframe].exits && 
+                    data[timeframe].analysis) {
+                    updateCharts(data[timeframe]);
+                    updateAnalysis(data[timeframe].analysis);
+                } else {
+                    console.error('Invalid data format received:', data);
+                    console.error('Expected format:', {
+                        [timeframe]: {
+                            timestamps: [],
+                            prices: [],
+                            entries: [],
+                            exits: [],
+                            analysis: {}
+                        }
+                    });
+                }
+            }).fail(function(error) {
+                console.error('Failed to fetch data:', error);
             });
         }
 
@@ -156,6 +201,38 @@
             Plotly.newPlot('balanceChart', [balanceTrace], balanceLayout);
         }
 
+        let allTrades = []; // 모든 거래 데이터 저장
+
+        function filterTrades(type) {
+            const tbody = document.getElementById('tradeHistoryBody');
+            let filteredTrades = allTrades;
+            
+            if (type === 'profit') {
+                filteredTrades = allTrades.filter(trade => parseFloat(trade.pnl) > 0);
+            } else if (type === 'loss') {
+                filteredTrades = allTrades.filter(trade => parseFloat(trade.pnl) < 0);
+            }
+            
+            updateTradeHistory(filteredTrades);
+        }
+
+        function updateTradeHistory(trades) {
+            const tbody = document.getElementById('tradeHistoryBody');
+            tbody.innerHTML = trades.map(trade => `
+                <tr>
+                    <td>${trade.entry_time}<br>${trade.exit_time}</td>
+                    <td>${trade.type}</td>
+                    <td>$${formatNumber(trade.entry_price)}</td>
+                    <td>$${formatNumber(trade.exit_price)}</td>
+                    <td>${formatNumber(trade.size, 4)}</td>
+                    <td class="${trade.pnl >= 0 ? 'positive' : 'negative'}">
+                        ${formatNumber(trade.pnl * 100)}%
+                    </td>
+                    <td>$${formatNumber(trade.balance)}</td>
+                </tr>
+            `).join('');
+        }
+
         function updateAnalysis(analysis) {
             // Account Performance 업데이트
             const accountHtml = `
@@ -211,20 +288,8 @@
             document.getElementById('tradeAnalysis').innerHTML = analysisHtml;
 
             // Trade History 업데이트
-            const tradeHistoryHtml = analysis.trades.map(trade => `
-                <tr>
-                    <td>${trade.entry_time}<br>${trade.exit_time}</td>
-                    <td>${trade.type}</td>
-                    <td>$${formatNumber(trade.entry_price)}</td>
-                    <td>$${formatNumber(trade.exit_price)}</td>
-                    <td>${formatNumber(trade.size, 4)}</td>
-                    <td class="${trade.pnl >= 0 ? 'positive' : 'negative'}">
-                        ${formatNumber(trade.pnl * 100)}%
-                    </td>
-                    <td>$${formatNumber(trade.balance)}</td>
-                </tr>
-            `).join('');
-            document.getElementById('tradeHistory').innerHTML = tradeHistoryHtml;
+            allTrades = analysis.trades; // 전체 거래 데이터 저장
+            updateTradeHistory(allTrades); // 초기 테이블 표시
         }
 
         // 초기 데이터 로드
