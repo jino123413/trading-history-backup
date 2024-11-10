@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Trading Strategy Performance</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .positive { color: #28a745; }
+        .negative { color: #dc3545; }
+        .card { margin-bottom: 20px; }
+        .table th { background-color: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h2>Trading Strategy Performance</h2>
+        
+        <!-- 타임프레임 선택 버튼 -->
+        <div class="btn-group mb-3">
+            <button class="btn btn-primary" onclick="updateTimeframe('1h')">1H</button>
+            <button class="btn btn-primary" onclick="updateTimeframe('4h')">4H</button>
+            <button class="btn btn-primary" onclick="updateTimeframe('1d')">1D</button>
+        </div>
+
+        <!-- 가격 차트 -->
+        <div class="card">
+            <div class="card-body">
+                <div id="priceChart"></div>
+            </div>
+        </div>
+
+        <!-- 계좌 잔고 차트 -->
+        <div class="card">
+            <div class="card-body">
+                <h4>Account Balance History</h4>
+                <div id="balanceChart"></div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Account Performance -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="mb-0">Account Performance</h4>
+                    </div>
+                    <div class="card-body" id="accountPerformance">
+                        <!-- JavaScript로 채워질 내용 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trade Analysis -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="mb-0">Trade Analysis</h4>
+                    </div>
+                    <div class="card-body" id="tradeAnalysis">
+                        <!-- JavaScript로 채워질 내용 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trade History -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h4 class="mb-0">Trade History</h4>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Entry Price</th>
+                            <th>Exit Price</th>
+                            <th>Size</th>
+                            <th>PnL</th>
+                            <th>Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tradeHistory">
+                        <!-- JavaScript로 채워질 내용 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function formatNumber(num, decimals = 2) {
+            return Number(num).toFixed(decimals);
+        }
+
+        function updateTimeframe(timeframe) {
+            $.get('/get_trading_data', { timeframe: timeframe }, function(data) {
+                updateCharts(data[timeframe]);
+                updateAnalysis(data[timeframe].analysis);
+            });
+        }
+
+        function updateCharts(data) {
+            // 가격 차트 업데이트
+            const priceTrace = {
+                x: data.timestamps,
+                y: data.prices,
+                type: 'scatter',
+                name: 'Price',
+                line: { color: '#17a2b8' }
+            };
+
+            const entryTrace = {
+                x: data.timestamps,
+                y: data.entries,
+                type: 'scatter',
+                mode: 'markers',
+                name: 'Entry',
+                marker: { color: '#28a745', size: 8 }
+            };
+
+            const exitTrace = {
+                x: data.timestamps,
+                y: data.exits,
+                type: 'scatter',
+                mode: 'markers',
+                name: 'Exit',
+                marker: { color: '#dc3545', size: 8 }
+            };
+
+            const layout = {
+                title: 'Bitcoin Price',
+                xaxis: { title: 'Date' },
+                yaxis: { title: 'Price (USD)' }
+            };
+
+            Plotly.newPlot('priceChart', [priceTrace, entryTrace, exitTrace], layout);
+
+            // 잔고 차트 업데이트
+            const balanceTrace = {
+                x: data.analysis.timestamps,
+                y: data.analysis.balance_history,
+                type: 'scatter',
+                name: 'Balance',
+                line: { color: '#28a745' }
+            };
+
+            const balanceLayout = {
+                title: 'Account Balance History',
+                xaxis: { title: 'Date' },
+                yaxis: { title: 'Balance (USD)' }
+            };
+
+            Plotly.newPlot('balanceChart', [balanceTrace], balanceLayout);
+        }
+
+        function updateAnalysis(analysis) {
+            // Account Performance 업데이트
+            const accountHtml = `
+                <table class="table">
+                    <tr>
+                        <td>Initial Balance</td>
+                        <td>$${formatNumber(analysis.initial_balance)}</td>
+                    </tr>
+                    <tr>
+                        <td>Final Balance</td>
+                        <td>$${formatNumber(analysis.final_balance)}</td>
+                    </tr>
+                    <tr>
+                        <td>Total Profit/Loss</td>
+                        <td class="${analysis.total_profit_amount >= 0 ? 'positive' : 'negative'}">
+                            $${formatNumber(analysis.total_profit_amount)} 
+                            (${formatNumber(analysis.total_profit_percentage)}%)
+                        </td>
+                    </tr>
+                </table>
+            `;
+            document.getElementById('accountPerformance').innerHTML = accountHtml;
+
+            // Trade Analysis 업데이트
+            const analysisHtml = `
+                <table class="table">
+                    <tr>
+                        <td>Total Trades</td>
+                        <td>${analysis.total_trades}</td>
+                    </tr>
+                    <tr>
+                        <td>Win Rate</td>
+                        <td>${formatNumber(analysis.win_rate)}%</td>
+                    </tr>
+                    <tr>
+                        <td>Average Profit</td>
+                        <td class="positive">+${formatNumber(analysis.avg_profit)}%</td>
+                    </tr>
+                    <tr>
+                        <td>Average Loss</td>
+                        <td class="negative">-${formatNumber(analysis.avg_loss)}%</td>
+                    </tr>
+                    <tr>
+                        <td>Profit Factor</td>
+                        <td>${formatNumber(analysis.profit_factor)}</td>
+                    </tr>
+                    <tr>
+                        <td>Risk/Reward Ratio</td>
+                        <td>${formatNumber(analysis.risk_reward_ratio)}</td>
+                    </tr>
+                </table>
+            `;
+            document.getElementById('tradeAnalysis').innerHTML = analysisHtml;
+
+            // Trade History 업데이트
+            const tradeHistoryHtml = analysis.trades.map(trade => `
+                <tr>
+                    <td>${trade.entry_time}<br>${trade.exit_time}</td>
+                    <td>${trade.type}</td>
+                    <td>$${formatNumber(trade.entry_price)}</td>
+                    <td>$${formatNumber(trade.exit_price)}</td>
+                    <td>${formatNumber(trade.size, 4)}</td>
+                    <td class="${trade.pnl >= 0 ? 'positive' : 'negative'}">
+                        ${formatNumber(trade.pnl * 100)}%
+                    </td>
+                    <td>$${formatNumber(trade.balance)}</td>
+                </tr>
+            `).join('');
+            document.getElementById('tradeHistory').innerHTML = tradeHistoryHtml;
+        }
+
+        // 초기 데이터 로드
+        $(document).ready(function() {
+            updateTimeframe('1h');
+        });
+    </script>
+</body>
+</html>
+
+
