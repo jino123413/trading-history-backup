@@ -10,7 +10,6 @@ import traceback
 import logging
 
 # 로깅 설정 개선
-<<<<<<< HEAD
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -26,14 +25,6 @@ def fetch_data(symbol='BTC/USDT', timeframe='1h', limit=1000):
     try:
         exchange = ccxt.bitget()
         exchange.verbose = False  # ccxt의 상세 로깅 비활성화
-=======
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-
-def fetch_data(symbol='BTC/USDT', timeframe='1h', limit=1000):
-    try:
-        exchange = ccxt.bitget()
->>>>>>> f0c952e15b7c3b1bf15071a8efe2851a52f07d01
         ohlcv = exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
         
         df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
@@ -41,11 +32,7 @@ def fetch_data(symbol='BTC/USDT', timeframe='1h', limit=1000):
         
         return df
     except Exception as e:
-<<<<<<< HEAD
         logger.error(f"Error fetching data: {str(e)}")
-=======
-        print(f"Error fetching data: {str(e)}")
->>>>>>> f0c952e15b7c3b1bf15071a8efe2851a52f07d01
         raise
 
 def preprocess_data(df):
